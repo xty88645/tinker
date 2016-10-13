@@ -246,17 +246,6 @@ if (buildWithTinker()) {
         ignoreWarning = false
 
         /**
-         * optional，default 'false'
-         * if usePreGeneratedPatchDex is true, tinker framework will insert auxiliary instruction
-         * when compiling base package using assemble{Debug/Release} task to prevent class
-         * pre-verified issue in dvm. Besides, a real dex file contains necessary class
-         * will be generated and packed into patch package instead of any patch info files.
-         *
-         * Use this mode if you have to use any dex encryption solutions.
-         */
-        usePreGeneratedPatchDex = true
-
-        /**
          * optional，default 'true'
          * whether sign the patch file
          * if not, you must do yourself. otherwise it can't check success during the patch loading
@@ -302,6 +291,16 @@ if (buildWithTinker()) {
              */
             dexMode = "jar"
             /**
+             * optional，default 'false'
+             * if usePreGeneratedPatchDex is true, tinker framework will insert auxiliary instruction
+             * when compiling base package using assemble{Debug/Release} task to prevent class
+             * pre-verified issue in dvm. Besides, a real dex file contains necessary class
+             * will be generated and packed into patch package instead of any patch info files.
+             *
+             * Use this mode if you have to use any dex encryption solutions.
+             */
+            usePreGeneratedPatchDex = false
+            /**
              * necessary，default '[]'
              * what dexes in apk are expected to deal with tinkerPatch
              * it support * or ? pattern.
@@ -318,6 +317,7 @@ if (buildWithTinker()) {
              *
              */
             loader = ["com.tencent.tinker.loader.*",
+                      //warning, you must change it with your application
                       "tinker.sample.android.SampleApplication",
                       //use sample, let BaseBuildInfo unchangeable with tinker
                       "tinker.sample.android.app.BaseBuildInfo"
