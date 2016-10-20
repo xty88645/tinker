@@ -24,6 +24,8 @@ import com.tencent.tinker.build.util.TypedValue
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.UnknownTaskException
+
 /**
  * Registers the plugin's tasks.
  *
@@ -97,6 +99,19 @@ class TinkerPatchPlugin implements Plugin<Project> {
                 def variantOutput = variant.outputs.first()
                 def variantName = variant.name.capitalize()
 
+                try {
+                    def instantRunTask = project.tasks.getByName("transformClassesWithInstantRunFor${variantName}")
+                    if (instantRunTask) {
+                        throw new GradleException(
+                                "Tinker does not support instant run mode, please trigger build"
+                                        + " by assemble${variantName} or disable instant run"
+                                        + " in 'File->Settings...'."
+                        )
+                    }
+                } catch (UnknownTaskException e) {
+                    // Not in instant run mode, continue.
+                }
+
                 TinkerPatchSchemaTask tinkerPatchBuildTask = project.tasks.create("tinkerPatch${variantName}", TinkerPatchSchemaTask)
                 tinkerPatchBuildTask.dependsOn variant.assemble
 
@@ -117,6 +132,14 @@ class TinkerPatchPlugin implements Plugin<Project> {
 
                 variantOutput.processResources.dependsOn manifestTask
 
+                //resource id
+                TinkerResourceIdTask applyResourceTask = project.tasks.create("tinkerProcess${variantName}ResourceId", TinkerResourceIdTask)
+                applyResourceTask.resDir = variantOutput.processResources.resDir
+                //let applyResourceTask run after manifestTask
+                applyResourceTask.mustRunAfter manifestTask
+
+                variantOutput.processResources.dependsOn applyResourceTask
+
                 // Add this proguard settings file to the list
                 boolean proguardEnable = variant.getBuildType().buildType.minifyEnabled
 
@@ -134,14 +157,7 @@ class TinkerPatchPlugin implements Plugin<Project> {
                     multidexConfigTask.applicationVariant = variant
                     variantOutput.packageApplication.dependsOn multidexConfigTask
                 }
-//                if (tempResourceFile != null && tempResourceFile.exists() && tempResourceFile.isFile()) {
-                    TinkerResourceIdTask applyResourceTask = project.tasks.create("tinkerProcess${variantName}ResourceId", TinkerResourceIdTask)
-                    applyResourceTask.resDir = variantOutput.processResources.resDir
-                    variantOutput.processResources.dependsOn applyResourceTask
-//                }
-//                else {
-//                    project.logger.error("apply resource mapping file ${resourceMappingFile} is not exist, just ignore")
-//                }
+
             }
         }
 

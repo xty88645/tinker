@@ -95,14 +95,19 @@ public class ResDiffDecoder extends BaseDecoder {
 
     @Override
     public boolean patch(File oldFile, File newFile) throws IOException, TinkerPatchException {
+        String name = getRelativeString(newFile);
+        if (name.equals(TypedValue.RES_ARSC)) {
+            oldArscFile = oldFile;
+            newArscFile = newFile;
+        }
         //actually, it won't go below
         if (newFile == null || !newFile.exists()) {
-            String name = getRelativeStringByOldDir(oldFile);
-            if (Utils.checkFileInPattern(config.mResIgnoreChangePattern, name)) {
-                Logger.e("found delete resource: " + name + " ,but it match ignore change pattern, just ignore!");
+            String relativeStringByOldDir = getRelativeStringByOldDir(oldFile);
+            if (Utils.checkFileInPattern(config.mResIgnoreChangePattern, relativeStringByOldDir)) {
+                Logger.e("found delete resource: " + relativeStringByOldDir + " ,but it match ignore change pattern, just ignore!");
                 return false;
             }
-            deletedSet.add(name);
+            deletedSet.add(relativeStringByOldDir);
             writeResLog(newFile, oldFile, TypedValue.DEL);
             return true;
         }
@@ -110,7 +115,6 @@ public class ResDiffDecoder extends BaseDecoder {
         File outputFile = getOutputPath(newFile).toFile();
 
         if (oldFile == null || !oldFile.exists()) {
-            String name = getRelativeString(newFile);
             if (Utils.checkFileInPattern(config.mResIgnoreChangePattern, name)) {
                 Logger.e("found add resource: " + name + " ,but it match ignore change pattern, just ignore!");
                 return false;
@@ -132,7 +136,6 @@ public class ResDiffDecoder extends BaseDecoder {
         if (oldMd5 != null && oldMd5.equals(newMd5)) {
             return false;
         }
-        String name = getRelativeString(newFile);
         if (Utils.checkFileInPattern(config.mResIgnoreChangePattern, name)) {
             Logger.d("found modify resource: " + name + ", but it match ignore change pattern, just ignore!");
             return false;
@@ -148,8 +151,6 @@ public class ResDiffDecoder extends BaseDecoder {
             }
             //deal with resources.arsc later
             arscChanged = true;
-            oldArscFile = oldFile;
-            newArscFile = newFile;
             return true;
         }
         dealWithModeFile(name, newMd5, oldFile, newFile, outputFile);
@@ -288,9 +289,9 @@ public class ResDiffDecoder extends BaseDecoder {
         String resZipMd5 = Utils.genResOutputFile(extractToZip, tempResZip, config,
             addedSet, modifiedSet, deletedSet, largeModifiedSet, largeModifiedMap);
 
-        Logger.e("final normal zip resource: %s, size=%d, md5=%s", extractToZip.getName(), extractToZip.length(), resZipMd5);
+        Logger.e("Final normal zip resource: %s, size=%d, md5=%s", extractToZip.getName(), extractToZip.length(), resZipMd5);
         logWriter.writeLineToInfoFile(
-            String.format("final normal zip resource: %s, size=%d, md5=%s", extractToZip.getName(), extractToZip.length(), resZipMd5)
+            String.format("Final normal zip resource: %s, size=%d, md5=%s", extractToZip.getName(), extractToZip.length(), resZipMd5)
         );
         //delete temp file
         FileOperation.deleteFile(tempResZip);
@@ -308,9 +309,9 @@ public class ResDiffDecoder extends BaseDecoder {
                     addedSet, modifiedSet, deletedSet, largeModifiedSet, largeModifiedMap);
                 //delete temp file
                 FileOperation.deleteFile(tempRes7Zip);
-                Logger.e("final 7zip resource: %s, size=%d, md5=%s", extractTo7Zip.getName(), extractTo7Zip.length(), res7zipMd5);
+                Logger.e("Final 7zip resource: %s, size=%d, md5=%s", extractTo7Zip.getName(), extractTo7Zip.length(), res7zipMd5);
                 logWriter.writeLineToInfoFile(
-                    String.format("final 7zip resource: %s, size=%d, md5=%s", extractTo7Zip.getName(), extractTo7Zip.length(), res7zipMd5)
+                    String.format("Final 7zip resource: %s, size=%d, md5=%s", extractTo7Zip.getName(), extractTo7Zip.length(), res7zipMd5)
                 );
             }
         }

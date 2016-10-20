@@ -25,7 +25,7 @@ dependencies {
 
 def gitSha() {
     try {
-        String gitRev = 'git rev-parse --short HEAD'.execute().text.trim()
+        String gitRev = 'git rev-parse --short HEAD'.execute(null, project.rootDir).text.trim()
         if (gitRev == null) {
             throw new GradleException("can't get git rev, you should add git to system path or just input test value, such as 'testTinkerId'")
         }
@@ -193,7 +193,7 @@ ext {
 //    tinkerOldApkPath=""
     tinkerOldApkPath = "${bakPath}/app-debug-1011-19-08-52.apk"
     //proguard mapping file to build patch apk
-    tinkerApplyMappingPath = "${bakPath}/"
+    tinkerApplyMappingPath = "${bakPath}/app-debug-1018-17-32-47-mapping.txt"
     //resource R.txt to build patch apk, must input if there is resource changed
     tinkerApplyResourcePath = "${bakPath}/app-debug-1011-19-08-52-R.txt"
 //    tinkerApplyResourcePath=""
@@ -328,7 +328,7 @@ if (buildWithTinker()) {
              */
             loader = ["com.tencent.tinker.loader.*",
                       //warning, you must change it with your application
-                      "tinker.sample.android.SampleApplication",
+                      "tinker.sample.android.app.SampleApplication",
                       //use sample, let BaseBuildInfo unchangeable with tinker
                       "tinker.sample.android.app.BaseBuildInfo"
             ]
