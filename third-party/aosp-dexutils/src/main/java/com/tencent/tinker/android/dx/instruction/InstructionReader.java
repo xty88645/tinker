@@ -23,7 +23,7 @@ import java.io.EOFException;
 
 /**
  * *** This file is NOT a part of AOSP. ***
- *
+ * <p>
  * Created by tangyinsheng on 2016/5/26.
  */
 public final class InstructionReader {
@@ -36,17 +36,18 @@ public final class InstructionReader {
     public void accept(InstructionVisitor iv) throws EOFException {
         codeIn.reset();
         while (codeIn.hasMore()) {
-            int currentAddress = codeIn.cursor();
-            int opcodeUnit = codeIn.read();
+            int currentAddress = codeIn.cursor();//取出当前cursor，从0开始
+            int opcodeUnit = codeIn.read();//读取每个指令
             int opcodeForSwitch = Opcodes.extractOpcodeFromUnit(opcodeUnit);
             switch (opcodeForSwitch) {
                 case Opcodes.SPECIAL_FORMAT: {
                     iv.visitZeroRegisterInsn(currentAddress, opcodeUnit, 0, InstructionCodec.INDEX_TYPE_NONE, 0, 0L);
                     break;
                 }
-                case Opcodes.GOTO: {
+                case Opcodes.GOTO: {//28F0 - goto 0005
                     int opcode = InstructionCodec.byte0(opcodeUnit);
-                    int target = (byte) InstructionCodec.byte1(opcodeUnit); // sign-extend
+                    int target = (byte) InstructionCodec.byte1(opcodeUnit); // sign-extend 取出f0
+                    // 访问0寄存器使用的指令
                     iv.visitZeroRegisterInsn(currentAddress, opcode, 0, InstructionCodec.INDEX_TYPE_NONE, currentAddress + target, 0L);
                     break;
                 }

@@ -112,7 +112,7 @@ public final class InstructionPromoter extends InstructionVisitor {
         switch (opcode) {
             case Opcodes.CONST_STRING: {
                 if (index > 0xFFFF) {
-                    this.currentPromotedAddress += 3;
+                        this.currentPromotedAddress += 3;
                 } else {
                     this.currentPromotedAddress += 2;
                 }

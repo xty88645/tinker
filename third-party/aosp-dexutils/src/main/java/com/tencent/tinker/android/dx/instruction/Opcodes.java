@@ -257,12 +257,14 @@ public final class Opcodes {
      */
     public static final int PACKED_SWITCH_PAYLOAD = 0x100;
 
-    /** special pseudo-opcode value for packed-switch data payload
+    /**
+     * special pseudo-opcode value for packed-switch data payload
      * instructions
      */
     public static final int SPARSE_SWITCH_PAYLOAD = 0x200;
 
-    /** special pseudo-opcode value for fill-array-data data payload
+    /**
+     * special pseudo-opcode value for fill-array-data data payload
      * instructions
      */
     public static final int FILL_ARRAY_DATA_PAYLOAD = 0x300;
@@ -288,7 +290,7 @@ public final class Opcodes {
          * ((byteValue << 8) | 0xff).
          */
 
-        int lowByte = opcodeUnit & 0xff;
+        int lowByte = opcodeUnit & 0xff;//取低位，假如int值超过255，则说明溢出
         return ((lowByte == 0) || (lowByte == 0xff)) ? opcodeUnit : lowByte;
     }
 }

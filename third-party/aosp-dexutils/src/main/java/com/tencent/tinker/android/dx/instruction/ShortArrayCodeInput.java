@@ -22,7 +22,9 @@ import java.io.EOFException;
  * Reads code from a {@code short[]}.
  */
 public final class ShortArrayCodeInput extends CodeCursor {
-    /** source array to read from */
+    /**
+     * source array to read from
+     */
     private final short[] array;
 
     /**
@@ -50,8 +52,8 @@ public final class ShortArrayCodeInput extends CodeCursor {
     public int read() throws EOFException {
         try {
             int value = array[cursor()];
-            advance(1);
-            return value & 0xffff;
+            advance(1);//指针向前推进1
+            return value & 0xffff;//0x00~0xff&0xffff
         } catch (ArrayIndexOutOfBoundsException ex) {
             throw new EOFException();
         }

@@ -38,8 +38,8 @@ public final class InstructionTransformer {
     }
 
     public short[] transform(short[] encodedInstructions) throws DexException {
-        ShortArrayCodeOutput out = new ShortArrayCodeOutput(encodedInstructions.length);
-        InstructionPromoter ipmo = new InstructionPromoter();
+        ShortArrayCodeOutput out = new ShortArrayCodeOutput(encodedInstructions.length);//因为每个指令的长度是u1 也就是0~255
+        InstructionPromoter ipmo = new InstructionPromoter();//TODO:这个类的作用还不清楚，待补
         InstructionWriter iw = new InstructionWriter(out, ipmo);
         InstructionReader ir = new InstructionReader(new ShortArrayCodeInput(encodedInstructions));
 
