@@ -18,6 +18,7 @@ package com.tencent.tinker.lib.patch;
 
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
+import android.os.Build;
 import android.os.SystemClock;
 
 import com.tencent.tinker.commons.dexpatcher.DexPatchApplier;
@@ -53,7 +54,6 @@ public class DexDiffPatchInternal extends BasePatchInternal {
 
     protected static boolean tryRecoverDexFiles(Tinker manager, ShareSecurityCheck checker, Context context,
                                                 String patchVersionDirectory, File patchFile, boolean isUpgradePatch) {
-
         if (!manager.isEnabledForDex()) {
             TinkerLog.w(TAG, "patch recover, dex is not enabled");
             return true;
@@ -73,6 +73,8 @@ public class DexDiffPatchInternal extends BasePatchInternal {
     }
 
     private static boolean patchDexExtractViaDexDiff(Context context, String patchVersionDirectory, String meta, File patchFile, boolean isUpgradePatch) {
+        checkVmArtProperty();
+
         String dir = patchVersionDirectory + "/" + DEX_PATH + "/";
 
         int dexType = ShareTinkerInternals.isVmArt() ? TYPE_DEX_FOR_ART : TYPE_DEX;
@@ -180,6 +182,10 @@ public class DexDiffPatchInternal extends BasePatchInternal {
                 String dexDiffMd5 = info.dexDiffMd5;
                 String oldDexCrc = info.oldDexCrC;
 
+                if (!ShareTinkerInternals.isVmArt() && info.destMd5InDvm.equals("0")) {
+                    TinkerLog.w(TAG, "patch dex %s is only for art, just continue", patchRealPath);
+                    continue;
+                }
                 String extractedFileMd5 = ShareTinkerInternals.isVmArt() ? info.destMd5InArt : info.destMd5InDvm;
 
                 if (!SharePatchFileUtil.checkIfMd5Valid(extractedFileMd5)) {
@@ -240,21 +246,46 @@ public class DexDiffPatchInternal extends BasePatchInternal {
                         return false;
                     }
 
-                    InputStream oldDexIs = null;
+                    final boolean isRawDexFile = SharePatchFileUtil.isRawDexFile(info.rawName);
+                    InputStream oldInputStream = apk.getInputStream(rawApkFileEntry);
+                    //if it is not the dex file or we are using jar mode, we should repack the output dex to jar
                     try {
-                        oldDexIs = apk.getInputStream(rawApkFileEntry);
-                        new DexPatchApplier(oldDexIs, (int) rawApkFileEntry.getSize(), null, smallPatchInfoFile).executeAndSaveTo(extractedFile);
-                    } catch (Throwable e) {
-                        TinkerLog.w(TAG, "Failed to recover dex file " + extractedFile.getPath());
-                        manager.getPatchReporter().onPatchTypeExtractFail(patchFile, extractedFile, info.rawName, type, isUpgradePatch);
-                        SharePatchFileUtil.safeDeleteFile(extractedFile);
-                        return false;
+                        if (!isRawDexFile || info.isJarMode) {
+                            FileOutputStream fos = new FileOutputStream(extractedFile);
+                            ZipOutputStream zos = new ZipOutputStream(new
+                                    BufferedOutputStream(fos));
+                            try {
+                                zos.putNextEntry(new ZipEntry(ShareConstants.DEX_IN_JAR));
+                                //it is not a raw dex file, we do not want to any temp files
+                                int oldDexSize;
+                                if (!isRawDexFile) {
+                                    ZipEntry entry;
+                                    ZipInputStream zis = new ZipInputStream(oldInputStream);
+                                    while ((entry = zis.getNextEntry()) != null) {
+                                        if (ShareConstants.DEX_IN_JAR.equals(entry.getName())) break;
+                                    }
+                                    if (entry == null) {
+                                        throw new TinkerRuntimeException("can't recognize zip dex format file:" + extractedFile.getAbsolutePath());
+                                    }
+                                    oldInputStream = zis;
+                                    oldDexSize = (int) entry.getSize();
+                                } else {
+                                    oldDexSize = (int) rawApkFileEntry.getSize();
+                                }
+                                new DexPatchApplier(oldInputStream, oldDexSize, null, smallPatchInfoFile).executeAndSaveTo(zos);
+                                zos.closeEntry();
+                            } finally {
+                                SharePatchFileUtil.closeQuietly(zos);
+                            }
+                        } else {
+                            new DexPatchApplier(oldInputStream, (int) rawApkFileEntry.getSize(), null, smallPatchInfoFile).executeAndSaveTo(extractedFile);
+                        }
                     } finally {
-                        SharePatchFileUtil.closeQuietly(oldDexIs);
+                        SharePatchFileUtil.closeQuietly(oldInputStream);
                     }
 
                     if (!SharePatchFileUtil.verifyDexFileMd5(extractedFile, extractedFileMd5)) {
-                        TinkerLog.w(TAG, "Failed to recover dex file " + extractedFile.getPath());
+                        TinkerLog.w(TAG, "Failed to recover dex file when verify patched dex: " + extractedFile.getPath());
                         manager.getPatchReporter().onPatchTypeExtractFail(patchFile, extractedFile, info.rawName, type, isUpgradePatch);
                         SharePatchFileUtil.safeDeleteFile(extractedFile);
                         return false;
@@ -328,7 +359,7 @@ public class DexDiffPatchInternal extends BasePatchInternal {
                     }
 
                     if (!SharePatchFileUtil.verifyDexFileMd5(extractedFile, extractedFileMd5)) {
-                        TinkerLog.w(TAG, "Failed to recover dex file " + extractedFile.getPath());
+                        TinkerLog.w(TAG, "Failed to recover dex file when verify patched dex: " + extractedFile.getPath());
                         manager.getPatchReporter().onPatchTypeExtractFail(patchFile, extractedFile, info.rawName, type, isUpgradePatch);
                         SharePatchFileUtil.safeDeleteFile(extractedFile);
                         return false;
@@ -401,6 +432,16 @@ public class DexDiffPatchInternal extends BasePatchInternal {
             }
         }
         return isExtractionSuccessful;
+    }
+
+    /**
+     * reject dalvik vm, but sdk version is larger than 21
+     */
+    private static void checkVmArtProperty() {
+        boolean art = ShareTinkerInternals.isVmArt();
+        if (!art && Build.VERSION.SDK_INT >= 21) {
+            throw new TinkerRuntimeException("it is dalvik vm, but sdk version " + Build.VERSION.SDK_INT + " is larger than 21!");
+        }
     }
 
     private static boolean extractDexFile(ZipFile zipFile, ZipEntry entryFile, File extractTo, ShareDexDiffPatchInfo dexInfo) throws IOException {
