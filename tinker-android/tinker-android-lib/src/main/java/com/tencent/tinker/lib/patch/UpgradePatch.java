@@ -17,6 +17,7 @@
 package com.tencent.tinker.lib.patch;
 
 import android.content.Context;
+import android.os.Build;
 
 import com.tencent.tinker.lib.service.PatchResult;
 import com.tencent.tinker.lib.tinker.Tinker;
@@ -63,9 +64,6 @@ public class UpgradePatch extends AbstractPatch {
             return false;
         }
 
-        patchResult.patchTinkerID = signatureCheck.getNewTinkerID();
-        patchResult.baseTinkerID = signatureCheck.getTinkerID();
-
         //it is a new patch, so we should not find a exist
         SharePatchInfo oldInfo = manager.getTinkerLoadResultIfPresent().patchInfo;
         String patchMd5 = SharePatchFileUtil.getMD5(patchFile);
@@ -93,9 +91,9 @@ public class UpgradePatch extends AbstractPatch {
                 manager.getPatchReporter().onPatchVersionCheckFail(patchFile, oldInfo, patchMd5, true);
                 return false;
             }
-            newInfo = new SharePatchInfo(oldInfo.oldVersion, patchMd5);
+            newInfo = new SharePatchInfo(oldInfo.oldVersion, patchMd5, Build.FINGERPRINT);
         } else {
-            newInfo = new SharePatchInfo("", patchMd5);
+            newInfo = new SharePatchInfo("", patchMd5, Build.FINGERPRINT);
         }
 
         //check ok, we can real recover a new patch
