@@ -42,9 +42,12 @@ public class TinkerPatchService extends IntentService {
 
     private static final String        PATCH_PATH_EXTRA      = "patch_path_extra";
     private static final String        PATCH_NEW_EXTRA       = "patch_new_extra";
+    private static final String        RESULT_CLASS_EXTRA    = "patch_result_class";
+
     private static       AbstractPatch upgradePatchProcessor = null;
-    private static       AbstractPatch repairPatchProcessor  = null;
-    private static       int           notificationId        = ShareConstants.TINKER_PATCH_SERVICE_NOTIFICATION;
+    private static       AbstractPatch                          repairPatchProcessor = null;
+    private static       int                                    notificationId       = ShareConstants.TINKER_PATCH_SERVICE_NOTIFICATION;
+    private static       Class<? extends AbstractResultService> resultServiceClass   = null;
 
     /**
      * Creates an IntentService.  Invoked by your subclass's constructor.
@@ -57,13 +60,20 @@ public class TinkerPatchService extends IntentService {
         Intent intent = new Intent(context, TinkerPatchService.class);
         intent.putExtra(PATCH_PATH_EXTRA, path);
         intent.putExtra(PATCH_NEW_EXTRA, isUpgradePatch);
-
+        intent.putExtra(RESULT_CLASS_EXTRA, resultServiceClass.getName());
         context.startService(intent);
     }
 
-    public static void setPatchProcessor(AbstractPatch upgradePatch, AbstractPatch repairPatch) {
+    public static void setPatchProcessor(AbstractPatch upgradePatch, AbstractPatch repairPatch, Class<? extends AbstractResultService> serviceClass) {
         upgradePatchProcessor = upgradePatch;
         repairPatchProcessor = repairPatch;
+        resultServiceClass = serviceClass;
+        //try to load
+        try {
+            Class.forName(serviceClass.getName());
+        } catch (ClassNotFoundException e) {
+//            e.printStackTrace();
+        }
     }
 
     public static String getPatchPathExtra(Intent intent) {
@@ -71,6 +81,13 @@ public class TinkerPatchService extends IntentService {
             throw new TinkerRuntimeException("getPatchPathExtra, but intent is null");
         }
         return ShareIntentUtil.getStringExtra(intent, PATCH_PATH_EXTRA);
+    }
+
+    public static String getPatchResultExtra(Intent intent) {
+        if (intent == null) {
+            throw new TinkerRuntimeException("getPatchResultExtra, but intent is null");
+        }
+        return ShareIntentUtil.getStringExtra(intent, RESULT_CLASS_EXTRA);
     }
 
     public static boolean getPatchUpgradeExtra(Intent intent) {
@@ -144,19 +161,27 @@ public class TinkerPatchService extends IntentService {
         patchResult.costTime = cost;
         patchResult.e = e;
 
-        AbstractResultService.runResultService(context, patchResult);
+        AbstractResultService.runResultService(context, patchResult, getPatchResultExtra(intent));
 
     }
 
     private void increasingPriority() {
+//        if (Build.VERSION.SDK_INT > 24) {
+//            TinkerLog.i(TAG, "for Android 7.1, we just ignore increasingPriority job");
+//            return;
+//        }
         TinkerLog.i(TAG, "try to increase patch process priority");
-        Notification notification = new Notification();
-        if (Build.VERSION.SDK_INT < 18) {
-            startForeground(notificationId, notification);
-        } else {
-            startForeground(notificationId, notification);
-            // start InnerService
-            startService(new Intent(this, InnerService.class));
+        try {
+            Notification notification = new Notification();
+            if (Build.VERSION.SDK_INT < 18) {
+                startForeground(notificationId, notification);
+            } else {
+                startForeground(notificationId, notification);
+                // start InnerService
+                startService(new Intent(this, InnerService.class));
+            }
+        } catch (Throwable e) {
+            TinkerLog.i(TAG, "try to increase patch process priority error:" + e);
         }
     }
 
@@ -170,7 +195,7 @@ public class TinkerPatchService extends IntentService {
             super.onCreate();
             try {
                 startForeground(notificationId, new Notification());
-            } catch (NullPointerException e) {
+            } catch (Throwable e) {
                 TinkerLog.e(TAG, "InnerService set service for push exception:%s.", e);
             }
             // kill

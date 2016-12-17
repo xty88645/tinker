@@ -31,6 +31,8 @@ import org.gradle.api.tasks.TaskAction
 public class TinkerManifestTask extends DefaultTask {
     static final String MANIFEST_XML = TinkerPatchPlugin.TINKER_INTERMEDIATES + "AndroidManifest.xml"
     static final String TINKER_ID = "TINKER_ID"
+    static final String TINKER_ID_PREFIX = "tinker_id_"
+
     String manifestPath
     TinkerManifestTask() {
         group = 'tinker'
@@ -43,10 +45,14 @@ public class TinkerManifestTask extends DefaultTask {
         if (tinkerValue == null || tinkerValue.isEmpty()) {
             throw new GradleException('tinkerId is not set!!!')
         }
+
+        tinkerValue = TINKER_ID_PREFIX + tinkerValue
+
         project.logger.error("tinker add ${tinkerValue} to your AndroidManifest.xml ${manifestPath}")
 
         def ns = new Namespace("http://schemas.android.com/apk/res/android", "android")
-        def xml = new XmlParser().parse(manifestPath)
+
+        def xml = new XmlParser().parse(new InputStreamReader(new FileInputStream(manifestPath), "utf-8"))
 
         def application = xml.application[0]
         if (application) {
@@ -63,8 +69,7 @@ public class TinkerManifestTask extends DefaultTask {
             application.appendNode('meta-data', [(ns.name): TINKER_ID, (ns.value): tinkerValue])
 
             // Write the manifest file
-            def writer = new FileWriter(manifestPath)
-            def printer = new XmlNodePrinter(new PrintWriter(writer))
+            def printer = new XmlNodePrinter(new PrintWriter(manifestPath, "utf-8"))
             printer.preserveWhitespace = true
             printer.print(xml)
         }

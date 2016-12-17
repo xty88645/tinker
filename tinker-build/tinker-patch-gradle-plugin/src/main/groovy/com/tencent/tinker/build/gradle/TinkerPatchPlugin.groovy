@@ -16,23 +16,15 @@
 
 package com.tencent.tinker.build.gradle
 
-import com.tencent.tinker.build.gradle.extension.TinkerBuildConfigExtension
-import com.tencent.tinker.build.gradle.extension.TinkerDexExtension
-import com.tencent.tinker.build.gradle.extension.TinkerLibExtension
-import com.tencent.tinker.build.gradle.extension.TinkerPackageConfigExtension
-import com.tencent.tinker.build.gradle.extension.TinkerPatchExtension
-import com.tencent.tinker.build.gradle.extension.TinkerResourceExtension
-import com.tencent.tinker.build.gradle.extension.TinkerSevenZipExtension
-import com.tencent.tinker.build.gradle.task.TinkerManifestTask
-import com.tencent.tinker.build.gradle.task.TinkerMultidexConfigTask
-import com.tencent.tinker.build.gradle.task.TinkerPatchSchemaTask
-import com.tencent.tinker.build.gradle.task.TinkerProguardConfigTask
-import com.tencent.tinker.build.gradle.task.TinkerResourceIdTask
+import com.tencent.tinker.build.gradle.extension.*
+import com.tencent.tinker.build.gradle.task.*
+import com.tencent.tinker.build.gradle.transform.AuxiliaryInjectTransform
 import com.tencent.tinker.build.util.FileOperation
 import com.tencent.tinker.build.util.TypedValue
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.UnknownTaskException
 
 /**
  * Registers the plugin's tasks.
@@ -59,21 +51,37 @@ class TinkerPatchPlugin implements Plugin<Project> {
 
         def configuration = project.tinkerPatch
 
+        if (!project.plugins.hasPlugin('com.android.application')) {
+            throw new GradleException('generateTinkerApk: Android Application plugin required')
+        }
+
+        def android = project.extensions.android
+
+        //add the tinker anno resource to the package exclude option
+        android.packagingOptions.exclude("META-INF/services/javax.annotation.processing.Processor")
+        android.packagingOptions.exclude("TinkerAnnoApplication.tmpl")
+
+        //open jumboMode
+        android.dexOptions.jumboMode = true
+
+        //close preDexLibraries
+        try {
+            android.dexOptions.preDexLibraries = false
+        } catch (Throwable e) {
+            //no preDexLibraries field, just continue
+        }
+
+        android.registerTransform(new AuxiliaryInjectTransform(project))
+
         project.afterEvaluate {
-            if (!project.plugins.hasPlugin('com.android.application')) {
-                throw new GradleException('generateTinkerApk: Android Application plugin required')
-            }
-
-            def android = project.extensions.android
-            //add the tinker anno resource to the package exclude option
-            android.packagingOptions.exclude("META-INF/services/javax.annotation.processing.Processor")
-            android.packagingOptions.exclude("TinkerAnnoApplication.tmpl")
-            //open jumboMode
-            android.dexOptions.jumboMode = true
-
             project.logger.error("----------------------tinker build warning ------------------------------------")
+            project.logger.error("tinker auto operation: ")
+            project.logger.error("excluding annotation processor and source template from app packaging. Enable dx jumboMode to reduce package size.")
+            project.logger.error("enable dx jumboMode to reduce package size.")
+            project.logger.error("disable preDexLibraries to prevent ClassDefNotFoundException when your app is booting.")
+            project.logger.error("")
             project.logger.error("tinker will change your build configs:")
-            project.logger.error("we will add TINDER_ID=${configuration.buildConfig.tinkerId} in your build output manifest file build/intermediates/manifests/full/*")
+            project.logger.error("we will add TINKER_ID=${configuration.buildConfig.tinkerId} in your build output manifest file build/intermediates/manifests/full/*")
             project.logger.error("")
             project.logger.error("if minifyEnabled is true")
 
@@ -105,10 +113,23 @@ class TinkerPatchPlugin implements Plugin<Project> {
                 def variantOutput = variant.outputs.first()
                 def variantName = variant.name.capitalize()
 
+                try {
+                    def instantRunTask = project.tasks.getByName("transformClassesWithInstantRunFor${variantName}")
+                    if (instantRunTask) {
+                        throw new GradleException(
+                                "Tinker does not support instant run mode, please trigger build"
+                                        + " by assemble${variantName} or disable instant run"
+                                        + " in 'File->Settings...'."
+                        )
+                    }
+                } catch (UnknownTaskException e) {
+                    // Not in instant run mode, continue.
+                }
+
                 TinkerPatchSchemaTask tinkerPatchBuildTask = project.tasks.create("tinkerPatch${variantName}", TinkerPatchSchemaTask)
                 tinkerPatchBuildTask.dependsOn variant.assemble
 
-                tinkerPatchBuildTask.signconfig = variant.apkVariantData.variantConfiguration.signingConfig
+                tinkerPatchBuildTask.signConfig = variant.apkVariantData.variantConfiguration.signingConfig
 
                 variant.outputs.each { output ->
                     tinkerPatchBuildTask.buildApkPath = output.outputFile
@@ -124,6 +145,14 @@ class TinkerPatchPlugin implements Plugin<Project> {
                 manifestTask.mustRunAfter variantOutput.processManifest
 
                 variantOutput.processResources.dependsOn manifestTask
+
+                //resource id
+                TinkerResourceIdTask applyResourceTask = project.tasks.create("tinkerProcess${variantName}ResourceId", TinkerResourceIdTask)
+                applyResourceTask.resDir = variantOutput.processResources.resDir
+                //let applyResourceTask run after manifestTask
+                applyResourceTask.mustRunAfter manifestTask
+
+                variantOutput.processResources.dependsOn applyResourceTask
 
                 // Add this proguard settings file to the list
                 boolean proguardEnable = variant.getBuildType().buildType.minifyEnabled
@@ -142,14 +171,7 @@ class TinkerPatchPlugin implements Plugin<Project> {
                     multidexConfigTask.applicationVariant = variant
                     variantOutput.packageApplication.dependsOn multidexConfigTask
                 }
-//                if (tempResourceFile != null && tempResourceFile.exists() && tempResourceFile.isFile()) {
-                    TinkerResourceIdTask applyResourceTask = project.tasks.create("tinkerProcess${variantName}ResourceId", TinkerResourceIdTask)
-                    applyResourceTask.resDir = variantOutput.processResources.resDir
-                    variantOutput.processResources.dependsOn applyResourceTask
-//                }
-//                else {
-//                    project.logger.error("apply resource mapping file ${resourceMappingFile} is not exist, just ignore")
-//                }
+
             }
         }
 

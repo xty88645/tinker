@@ -17,6 +17,7 @@
 package com.tencent.tinker.lib.patch;
 
 import android.content.Context;
+import android.os.Build;
 
 import com.tencent.tinker.lib.service.PatchResult;
 import com.tencent.tinker.lib.tinker.Tinker;
@@ -56,15 +57,12 @@ public class UpgradePatch extends AbstractPatch {
         //check the signature, we should create a new checker
         ShareSecurityCheck signatureCheck = new ShareSecurityCheck(context);
 
-        int returnCode = ShareTinkerInternals.checkSignatureAndTinkerID(context, patchFile, signatureCheck);
+        int returnCode = ShareTinkerInternals.checkTinkerPackage(context, manager.getTinkerFlags(), patchFile, signatureCheck);
         if (returnCode != ShareConstants.ERROR_PACKAGE_CHECK_OK) {
             TinkerLog.e(TAG, "UpgradePatch tryPatch:onPatchPackageCheckFail");
             manager.getPatchReporter().onPatchPackageCheckFail(patchFile, true, returnCode);
             return false;
         }
-
-        patchResult.patchTinkerID = signatureCheck.getNewTinkerID();
-        patchResult.baseTinkerID = signatureCheck.getTinkerID();
 
         //it is a new patch, so we should not find a exist
         SharePatchInfo oldInfo = manager.getTinkerLoadResultIfPresent().patchInfo;
@@ -93,15 +91,15 @@ public class UpgradePatch extends AbstractPatch {
                 manager.getPatchReporter().onPatchVersionCheckFail(patchFile, oldInfo, patchMd5, true);
                 return false;
             }
-            newInfo = new SharePatchInfo(oldInfo.oldVersion, patchMd5);
+            newInfo = new SharePatchInfo(oldInfo.oldVersion, patchMd5, Build.FINGERPRINT);
         } else {
-            newInfo = new SharePatchInfo("", patchMd5);
+            newInfo = new SharePatchInfo("", patchMd5, Build.FINGERPRINT);
         }
 
         //check ok, we can real recover a new patch
         final String patchDirectory = manager.getPatchDirectory().getAbsolutePath();
 
-        TinkerLog.i(TAG, "UpgradePatch tryPatch:dexDiffMd5:%s", patchMd5);
+        TinkerLog.i(TAG, "UpgradePatch tryPatch:patchMd5:%s", patchMd5);
 
         final String patchName = SharePatchFileUtil.getPatchVersionDirectory(patchMd5);
 

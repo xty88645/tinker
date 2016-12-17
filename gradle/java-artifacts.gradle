@@ -1,5 +1,8 @@
 apply plugin: 'maven-publish'
 
+sourceCompatibility = rootProject.ext.javaVersion
+targetCompatibility = rootProject.ext.javaVersion
+
 task sourcesJar(type: Jar) {
     from sourceSets.main.java.srcDirs
     classifier = 'sources'
@@ -36,7 +39,9 @@ publishing {
     }
 }
 
-task buildAndPublishLocalMaven(dependsOn: ['build', 'publishTinkerPatchPublicationToMavenLocal']) {}
+task buildAndPublishTinkerToLocalMaven(dependsOn: ['build', 'publishTinkerPatchPublicationToMavenLocal']) {
+    group = 'tinker'
+}
 
 //depend checkstyle
 project.tasks.getByName("check").dependsOn tasks.getByName("checkstyle")

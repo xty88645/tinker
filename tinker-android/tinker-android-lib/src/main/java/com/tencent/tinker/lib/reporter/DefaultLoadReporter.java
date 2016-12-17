@@ -215,8 +215,17 @@ public class DefaultLoadReporter implements LoadReporter {
                 ShareTinkerInternals.setTinkerDisableWithSharedPreferences(context);
                 TinkerLog.i(TAG, "dex exception disable tinker forever with sp");
                 break;
+            case ShareConstants.ERROR_LOAD_EXCEPTION_DEX_OPT:
+                TinkerLog.i(TAG, "patch load parallel dex opt exception: %s", e);
+                break;
             case ShareConstants.ERROR_LOAD_EXCEPTION_RESOURCE:
-                TinkerLog.i(TAG, "patch load resource exception: %s", e);
+                if (e.getMessage().contains(ShareConstants.CHECK_RES_INSTALL_FAIL)) {
+                    TinkerLog.e(TAG, "tinker res check fail:" + e.getMessage());
+                } else {
+                    TinkerLog.i(TAG, "patch load resource exception: %s", e);
+                }
+                ShareTinkerInternals.setTinkerDisableWithSharedPreferences(context);
+                TinkerLog.i(TAG, "res exception disable tinker forever with sp");
                 break;
             case ShareConstants.ERROR_LOAD_EXCEPTION_UNCAUGHT:
                 TinkerLog.i(TAG, "patch load unCatch exception: %s", e);
@@ -225,8 +234,10 @@ public class DefaultLoadReporter implements LoadReporter {
                 break;
             case ShareConstants.ERROR_LOAD_EXCEPTION_UNKNOWN:
                 TinkerLog.i(TAG, "patch load unknown exception: %s", e);
+                //exception can be caught, it is no need to disable Tinker with sharedPreference
                 break;
         }
+        TinkerLog.e(TAG, "tinker load exception, welcome to submit issue to us: https://github.com/Tencent/tinker/issues");
         TinkerLog.printErrStackTrace(TAG, e, "tinker load exception");
 
         Tinker.with(context).setTinkerDisable();
@@ -246,6 +257,7 @@ public class DefaultLoadReporter implements LoadReporter {
      *                  {@code ShareConstants.ERROR_PACKAGE_CHECK_PATCH_TINKER_ID_NOT_FOUND}       can't find TINKER_PATCH in patch meta file
      *                  {@code ShareConstants.ERROR_PACKAGE_CHECK_TINKER_ID_NOT_EQUAL}             apk and patch's TINKER_PATCH value is not equal
      *                  {@code ShareConstants.ERROR_PACKAGE_CHECK_RESOURCE_META_CORRUPTED}         resource meta file's format check fail
+     *                  {@code ShareConstants.ERROR_PACKAGE_CHECK_TINKERFLAG_NOT_SUPPORT}          some patch file type is not supported for current tinkerFlag
      */
     @Override
     public void onLoadPackageCheckFail(File patchFile, int errorCode) {

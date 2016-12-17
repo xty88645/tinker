@@ -21,6 +21,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.util.Log;
 
 import java.io.File;
@@ -47,7 +48,26 @@ public class ShareTinkerInternals {
     private static String tinkerID = null;
 
     public static boolean isVmArt() {
-        return VM_IS_ART;
+        return VM_IS_ART || Build.VERSION.SDK_INT >= 21;
+    }
+
+    public static boolean isSystemOTA(String lastFingerPrint) {
+        String currentFingerprint = Build.FINGERPRINT;
+        if (lastFingerPrint == null
+            || lastFingerPrint.equals("")
+            || currentFingerprint == null
+            || currentFingerprint.equals("")) {
+            Log.d(TAG, "fingerprint empty:" + lastFingerPrint + ",current:" + currentFingerprint);
+            return false;
+        } else {
+            if (lastFingerPrint.equals(currentFingerprint)) {
+                Log.d(TAG, "same fingerprint:" + currentFingerprint);
+                return false;
+            } else {
+                Log.d(TAG, "system OTA,fingerprint not equal:" + lastFingerPrint + "," + currentFingerprint);
+                return true;
+            }
+        }
     }
 
     public static boolean isNullOrNil(final String object) {
@@ -57,6 +77,21 @@ public class ShareTinkerInternals {
         return false;
     }
 
+    /**
+     * thinker package check
+     * @param context
+     * @param tinkerFlag
+     * @param patchFile
+     * @param securityCheck
+     * @return
+     */
+    public static int checkTinkerPackage(Context context, int tinkerFlag, File patchFile, ShareSecurityCheck securityCheck) {
+        int returnCode = checkSignatureAndTinkerID(context, patchFile, securityCheck);
+        if (returnCode == ShareConstants.ERROR_PACKAGE_CHECK_OK) {
+            returnCode = checkPackageAndTinkerFlag(securityCheck, tinkerFlag);
+        }
+        return returnCode;
+    }
     /**
      * check patch file signature and TINKER_ID
      *
@@ -86,8 +121,34 @@ public class ShareTinkerInternals {
             return ShareConstants.ERROR_PACKAGE_CHECK_PATCH_TINKER_ID_NOT_FOUND;
         }
         if (!oldTinkerId.equals(patchTinkerId)) {
+            Log.e(TAG, "tinkerId is not equal, base is " + oldTinkerId + ", but patch is " + patchTinkerId);
             return ShareConstants.ERROR_PACKAGE_CHECK_TINKER_ID_NOT_EQUAL;
         }
+        return ShareConstants.ERROR_PACKAGE_CHECK_OK;
+    }
+
+
+    public static int checkPackageAndTinkerFlag(ShareSecurityCheck securityCheck, int tinkerFlag) {
+        if (isTinkerEnabledAll(tinkerFlag)) {
+            return ShareConstants.ERROR_PACKAGE_CHECK_OK;
+        }
+        HashMap<String, String> metaContentMap = securityCheck.getMetaContentMap();
+        //check dex
+        boolean dexEnable = isTinkerEnabledForDex(tinkerFlag);
+        if (!dexEnable && metaContentMap.containsKey(ShareConstants.DEX_META_FILE)) {
+            return ShareConstants.ERROR_PACKAGE_CHECK_TINKERFLAG_NOT_SUPPORT;
+        }
+        //check native library
+        boolean nativeEnable = isTinkerEnabledForNativeLib(tinkerFlag);
+        if (!nativeEnable && metaContentMap.containsKey(ShareConstants.SO_META_FILE)) {
+            return ShareConstants.ERROR_PACKAGE_CHECK_TINKERFLAG_NOT_SUPPORT;
+        }
+        //check resource
+        boolean resEnable = isTinkerEnabledForResource(tinkerFlag);
+        if (!resEnable && metaContentMap.containsKey(ShareConstants.RES_META_FILE)) {
+            return ShareConstants.ERROR_PACKAGE_CHECK_TINKERFLAG_NOT_SUPPORT;
+        }
+
         return ShareConstants.ERROR_PACKAGE_CHECK_OK;
     }
 

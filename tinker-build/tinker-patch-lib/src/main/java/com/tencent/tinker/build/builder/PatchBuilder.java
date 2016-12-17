@@ -23,7 +23,11 @@ import com.tencent.tinker.build.util.Logger;
 import com.tencent.tinker.build.util.TypedValue;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.security.Key;
+import java.security.KeyStore;
+import java.util.ArrayList;
 
 /**
  * @author zhangshaowen
@@ -44,7 +48,7 @@ public class PatchBuilder {
         this.sevenZipOutPutDir = new File(config.mOutFolder, TypedValue.OUT_7ZIP_FILE_PATH);
     }
 
-    public void buildPatch() throws IOException, InterruptedException {
+    public void buildPatch() throws Exception {
         final File resultDir = config.mTempResultDir;
         if (!resultDir.exists()) {
             throw new IOException(String.format(
@@ -54,7 +58,7 @@ public class PatchBuilder {
         if (resultDir.listFiles().length == 0) {
             return;
         }
-        generalUnsignedApk(unSignedApk);
+        generateUnsignedApk(unSignedApk);
         signApk(unSignedApk, signedApk);
 
         use7zApk(signedApk, signedWith7ZipApk, sevenZipOutPutDir);
@@ -79,32 +83,65 @@ public class PatchBuilder {
 
     }
 
+    private String getSignatureAlgorithm() throws Exception {
+        FileInputStream fileIn = new FileInputStream(config.mSignatureFile);
+        KeyStore keyStore = KeyStore.getInstance("JKS");
+        keyStore.load(fileIn, config.mStorePass.toCharArray());
+        Key key = keyStore.getKey(config.mStoreAlias, config.mKeyPass.toCharArray());
+        String keyAlgorithm = key.getAlgorithm();
+        String signatureAlgorithm;
+        if (keyAlgorithm.equalsIgnoreCase("DSA")) {
+            signatureAlgorithm = "SHA1withDSA";
+        } else if (keyAlgorithm.equalsIgnoreCase("RSA")) {
+            signatureAlgorithm = "SHA1withRSA";
+        } else if (keyAlgorithm.equalsIgnoreCase("EC")) {
+            signatureAlgorithm = "SHA1withECDSA";
+        } else {
+            throw new RuntimeException("private key is not a DSA or "
+                    + "RSA key");
+        }
+        return signatureAlgorithm;
+    }
+
     /**
      * @param input  unsigned file input
      * @param output signed file output
      * @throws IOException
      * @throws InterruptedException
      */
-    private void signApk(File input, File output) throws IOException, InterruptedException {
+    private void signApk(File input, File output) throws Exception {
         //sign apk
         if (config.mUseSignAPk) {
             Logger.d("Signing apk: %s", output.getName());
+            String signatureAlgorithm = getSignatureAlgorithm();
+            Logger.d("Signing key algorithm is %s", signatureAlgorithm);
+
             if (output.exists()) {
                 output.delete();
             }
-            String cmd = "jarsigner -sigalg MD5withRSA -digestalg SHA1 -keystore " + config.mSignatureFile
-                + " -storepass " + config.mStorePass
-                + " -keypass " + config.mKeyPass
-                + " -signedjar " + output.getAbsolutePath()
-                + " " + input.getAbsolutePath()
-                + " " + config.mStoreAlias;
-            Process pro = Runtime.getRuntime().exec(cmd);
-            //destroy the stream
-            pro.waitFor();
-            pro.destroy();
+            ArrayList<String> command = new ArrayList<>();
+            command.add("jarsigner");
+            // issue https://github.com/Tencent/tinker/issues/118
+            command.add("-sigalg");
+            command.add(signatureAlgorithm);
+            command.add("-digestalg");
+            command.add("SHA1");
+            command.add("-keystore");
+            command.add(config.mSignatureFile.getAbsolutePath());
+            command.add("-storepass");
+            command.add(config.mStorePass);
+            command.add("-keypass");
+            command.add(config.mKeyPass);
+            command.add("-signedjar");
+            command.add(output.getAbsolutePath());
+            command.add(input.getAbsolutePath());
+            command.add(config.mStoreAlias);
 
+            Process process = new ProcessBuilder(command).start();
+            process.waitFor();
+            process.destroy();
             if (!output.exists()) {
-                throw new IOException("Can't Generate signed APK. Please check your sign info is correct.");
+                throw new IOException("Can't Generate signed APK. Please check if your sign info is correct.");
             }
         }
     }
@@ -113,8 +150,8 @@ public class PatchBuilder {
      * @param output unsigned apk file output
      * @throws IOException
      */
-    private void generalUnsignedApk(File output) throws IOException {
-        Logger.d("General unsigned apk: %s", output.getName());
+    private void generateUnsignedApk(File output) throws IOException {
+        Logger.d("Generate unsigned apk: %s", output.getName());
         final File tempOutDir = config.mTempResultDir;
         if (!tempOutDir.exists()) {
             throw new IOException(String.format(

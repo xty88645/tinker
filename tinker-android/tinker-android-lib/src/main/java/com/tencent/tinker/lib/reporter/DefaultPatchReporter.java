@@ -69,6 +69,7 @@ public class DefaultPatchReporter implements PatchReporter {
      *                  {@code ShareConstants.ERROR_PACKAGE_CHECK_PATCH_TINKER_ID_NOT_FOUND}       can't find TINKER_PATCH in patch meta file
      *                  {@code ShareConstants.ERROR_PACKAGE_CHECK_TINKER_ID_NOT_EQUAL}             apk and patch's TINKER_PATCH value is not equal
      *                  {@code ShareConstants.ERROR_PACKAGE_CHECK_RESOURCE_META_CORRUPTED}         resource meta file's format check fail
+     *                  {@code ShareConstants.ERROR_PACKAGE_CHECK_TINKERFLAG_NOT_SUPPORT}          some patch file type is not supported for current tinkerFlag
      */
     @Override
     public void onPatchPackageCheckFail(File patchFile, boolean isUpgradePatch, int errorCode) {
@@ -179,6 +180,11 @@ public class DefaultPatchReporter implements PatchReporter {
     @Override
     public void onPatchException(File patchFile, Throwable e, boolean isUpgradePatch) {
         TinkerLog.i(TAG, "patchReporter: patch exception path:%s, throwable:%s, isUpgrade:%b", patchFile.getAbsolutePath(), e.getMessage(), isUpgradePatch);
+        TinkerLog.e(TAG, "tinker patch exception, welcome to submit issue to us: https://github.com/Tencent/tinker/issues");
+//        if (e.getMessage().contains(ShareConstants.CHECK_VM_PROPERTY_FAIL)) {
+//            ShareTinkerInternals.setTinkerDisableWithSharedPreferences(context);
+//            TinkerLog.i(TAG, "check vm property exception disable tinker forever with sp");
+//        }
         TinkerLog.printErrStackTrace(TAG, e, "tinker patch exception");
         //don't accept request any more!
         Tinker.with(context).setTinkerDisable();

@@ -59,15 +59,12 @@ public class RepairPatch extends AbstractPatch {
         ShareSecurityCheck signatureCheck = new ShareSecurityCheck(context);
 
 
-        int returnCode = ShareTinkerInternals.checkSignatureAndTinkerID(context, patchFile, signatureCheck);
+        int returnCode = ShareTinkerInternals.checkTinkerPackage(context, manager.getTinkerFlags(), patchFile, signatureCheck);
         if (returnCode != ShareConstants.ERROR_PACKAGE_CHECK_OK) {
             TinkerLog.e(TAG, "RepairPatch tryPatch:onPatchPackageCheckFail");
             manager.getPatchReporter().onPatchPackageCheckFail(patchFile, false, returnCode);
             return false;
         }
-
-        patchResult.patchTinkerID = signatureCheck.getNewTinkerID();
-        patchResult.baseTinkerID = signatureCheck.getTinkerID();
 
         //it is a old patch, so we should find a exist
         SharePatchInfo oldInfo = manager.getTinkerLoadResultIfPresent().patchInfo;
