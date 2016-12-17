@@ -51,6 +51,7 @@ public class Logger {
         }
         //add \n
         System.out.printf(log + "\n");
+        System.out.flush();
 
         logWriter.writeLineToInfoFile(log);
     }
@@ -66,10 +67,15 @@ public class Logger {
         }
         //add \n
         System.err.printf(log + "\n");
+<<<<<<< HEAD
         if (logWriter != null) {
             logWriter.writeLineToInfoFile(log);
         }
+=======
+        System.err.flush();
+>>>>>>> Tencent/dev
 
+        logWriter.writeLineToInfoFile(log);
     }
 
 }

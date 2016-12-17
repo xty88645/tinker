@@ -14,11 +14,25 @@
  * limitations under the License.
  */
 
-package com.tencent.tinker.lib.listener;
+package com.tencent.tinker.build.immutable;
 
-/**
- * Created by zhangshaowen on 16/3/14.
- */
-public interface PatchListener {
-    int onPatchReceived(String path);
+import java.util.HashSet;
+import java.util.Set;
+
+public class DexRefData {
+    int methodNum;
+    int fieldNum;
+    public Set<String> refFields;
+    public Set<String> refMtds;
+
+    DexRefData() {
+        this(0, 0);
+    }
+
+    DexRefData(int methodNum, int fieldNum) {
+        this.methodNum = methodNum;
+        this.fieldNum = fieldNum;
+        refFields = new HashSet<>();
+        refMtds = new HashSet<>();
+    }
 }
