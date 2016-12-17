@@ -24,10 +24,12 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.util.Log;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintStream;
 import java.util.HashMap;
 import java.util.Properties;
 import java.util.regex.Matcher;
@@ -187,6 +189,7 @@ public class ShareTinkerInternals {
             SharePatchFileUtil.closeZip(zipFile);
         }
     }
+
     public static String getManifestTinkerID(Context context) {
         if (tinkerID != null) {
             return tinkerID;
@@ -226,8 +229,6 @@ public class ShareTinkerInternals {
         switch (type) {
             case ShareConstants.TYPE_DEX:
                 return "dex";
-            case ShareConstants.TYPE_DEX_FOR_ART:
-                return "dex_art";
             case ShareConstants.TYPE_DEX_OPT:
                 return "dex_opt";
             case ShareConstants.TYPE_LIBRARY:
@@ -282,6 +283,9 @@ public class ShareTinkerInternals {
 
     public static void killAllOtherProcess(Context context) {
         final ActivityManager am = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        if (am == null) {
+            return;
+        }
         // NOTE: getRunningAppProcess() ONLY GIVE YOU THE PROCESS OF YOUR OWN PACKAGE IN ANDROID M
         // BUT THAT'S ENOUGH HERE
         for (ActivityManager.RunningAppProcessInfo ai : am.getRunningAppProcesses()) {
@@ -386,4 +390,50 @@ public class ShareTinkerInternals {
         }
         return isArt;
     }
+
+    public static String getExceptionCauseString(final Throwable ex) {
+        final ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        final PrintStream ps = new PrintStream(bos);
+
+        try {
+            // print directly
+            Throwable t = ex;
+            while (t.getCause() != null) {
+                t = t.getCause();
+            }
+            t.printStackTrace(ps);
+            return toVisualString(bos.toString());
+        } finally {
+            try {
+                bos.close();
+            } catch (IOException e) {
+            }
+        }
+    }
+
+    public static String toVisualString(String src) {
+        boolean cutFlg = false;
+        if (null == src) {
+            return null;
+        }
+        char[] chr = src.toCharArray();
+        if (null == chr) {
+            return null;
+        }
+        int i = 0;
+        for (; i < chr.length; i++) {
+            if (chr[i] > 127) {
+                chr[i] = 0;
+                cutFlg = true;
+                break;
+            }
+        }
+
+        if (cutFlg) {
+            return new String(chr, 0, i);
+        } else {
+            return src;
+        }
+    }
+
 }

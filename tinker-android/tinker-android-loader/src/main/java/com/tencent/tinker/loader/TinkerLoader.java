@@ -128,7 +128,12 @@ public class TinkerLoader extends AbstractTinkerLoader {
 
         //patch-641e634c
         String patchName = SharePatchFileUtil.getPatchVersionDirectory(version);
-
+        if (patchName == null) {
+            Log.w(TAG, "tryLoadPatchFiles:patchName is null");
+            //we may delete patch info file
+            ShareIntentUtil.setIntentReturnCode(resultIntent, ShareConstants.ERROR_LOAD_PATCH_VERSION_DIRECTORY_NOT_EXIST);
+            return;
+        }
         //tinker/patch.info/patch-641e634c
         String patchVersionDirectory = patchDirectoryPath + "/" + patchName;
         File patchVersionDirectoryFile = new File(patchVersionDirectory);
@@ -245,16 +250,14 @@ public class TinkerLoader extends AbstractTinkerLoader {
         String preferName = ShareConstants.TINKER_OWN_PREFERENCE_CONFIG + processName;
         //each process have its own SharedPreferences file
         SharedPreferences sp = application.getSharedPreferences(preferName, Context.MODE_PRIVATE);
-        int count = sp.getInt(ShareConstants.TINKER_SAFE_MODE_COUNT, 0);
+        int count = sp.getInt(ShareConstants.TINKER_SAFE_MODE_COUNT, 0) + 1;
         Log.w(TAG, "tinker safe mode preferName:" + preferName + " count:" + count);
         if (count >= ShareConstants.TINKER_SAFE_MODE_MAX_COUNT) {
             sp.edit().putInt(ShareConstants.TINKER_SAFE_MODE_COUNT, 0).commit();
             return false;
         }
         application.setUseSafeMode(true);
-        count++;
         sp.edit().putInt(ShareConstants.TINKER_SAFE_MODE_COUNT, count).commit();
-        Log.w(TAG, "after tinker safe mode count:" + count);
         return true;
     }
 
